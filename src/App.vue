@@ -7,14 +7,8 @@
     <section class="main" v-show="todos.length">
       <input class="toggle-all" type="checkbox" v-model="allDone">
       <ul class="todo-list">
-        <li class="todo" v-for="todo in filteredTodos" :key="todo.id" :class="{completed: todo.completed, editing: todo == editedTodo}">
-          <div class="view">
-            <input class="toggle" type="checkbox" v-model="todo.completed">
-            <label @dblclick="editTodo(todo)">{{todo.title}}</label>
-            <button class="destroy" @click="removeTodo(todo)"></button>
-          </div>
-          <input class="edit" type="text" v-model="todo.title" v-todo-focus="todo == editedTodo" @blur="doneEdit(todo)" @keyup.enter="doneEdit(todo)" @keyup.esc="cancelEdit(todo)">
-        </li>
+        <Todo class="todo" :todo="todo" v-for="todo in filteredTodos" :key="todo.updatedAt" :class="{completed: todo.completed, editing: todo == editedTodo}">
+        </Todo>
       </ul>
     </section>
     <footer class="footer" v-show="todos.length">
@@ -35,14 +29,13 @@
                @click="visibility = 'completed'"
                >Completed</a></li>
       </ul>
-      <button class="clear-completed" @click="removeCompleted" v-show="todos.length > remaining">
-        Clear completed
-      </button>
     </footer>
   </div>
 </template>
 
 <script>
+import axios from 'axios';
+import Todo from './components/Todo';
 
 const filters = {
   all(todos) {
@@ -59,14 +52,19 @@ const filters = {
 export default {
   name: 'app',
   components: {
+    Todo,
   },
   data() {
     return {
-      todos: this.fetch(),
+      todos: [],
       newTodo: '',
       editedTodo: null,
       visibility: 'all',
+      api: 'https://grdao5tka1.execute-api.eu-central-1.amazonaws.com/dev/todos',
     };
+  },
+  created() {
+    this.fetch();
   },
 
   // watch todos change for localStorage persistence
@@ -102,7 +100,13 @@ export default {
 
   methods: {
     fetch() {
-      return JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '[]');
+      axios.get(this.api)
+        .then((response) => {
+          this.todos = response.data.items;
+        })
+        .catch((e) => {
+          this.errors.push(e);
+        });
     },
     save(todos) {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(todos));
@@ -113,20 +117,33 @@ export default {
 
     addTodo() {
       const value = this.newTodo && this.newTodo.trim();
+      const data = { text: value, completed: false };
       if (!value) {
         return;
       }
-      this.todos.push({ id: this.todos.length + 1, title: value, completed: false });
+      console.log(this.newTodo);
+      axios.post(this.api, data)
+        .then((results) => {
+          this.todos.push(results.data);
+        })
+        .catch((e) => {
+          this.errors.push(e);
+        });
       this.newTodo = '';
     },
 
     removeTodo(todo) {
       const index = this.todos.indexOf(todo);
       this.todos.splice(index, 1);
+      axios.delete(`${this.api}/${todo.todo_id}`)
+        .then()
+        .catch((e) => {
+          this.errors.push(e);
+        });
     },
 
     editTodo(todo) {
-      this.beforeEditCache = todo.title;
+      this.beforeEditCache = todo.text;
       this.editedTodo = todo;
     },
 
@@ -135,19 +152,20 @@ export default {
         return;
       }
       this.editedTodo = null;
-      todo.title = todo.title.trim();
-      if (!todo.title) {
+      todo.text = todo.text.trim();
+      axios.put(`${this.api}/${todo.todo_id}`, todo)
+        .then()
+        .catch((e) => {
+          this.errors.push(e);
+        });
+      if (!todo.text) {
         this.removeTodo(todo);
       }
     },
 
     cancelEdit(todo) {
       this.editedTodo = null;
-      todo.title = this.beforeEditCache;
-    },
-
-    removeCompleted() {
-      this.todos = filters.active(this.todos);
+      todo.text = this.beforeEditCache;
     },
 
   },
