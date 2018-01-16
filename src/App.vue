@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div id="app" class="todoapp">
     <header class="header">
       <h1>todos</h1>
       <input class="new-todo" autofocus autocomplete="off" placeholder="What needs to be done?" v-model="newTodo" @keyup.enter="addTodo">
@@ -7,7 +7,13 @@
     <section class="main" v-show="todos.length">
       <input class="toggle-all" type="checkbox" v-model="allDone">
       <ul class="todo-list">
-        <Todo class="todo" :todo="todo" v-for="todo in filteredTodos" :key="todo.updatedAt" :class="{completed: todo.completed, editing: todo == editedTodo}">
+        <Todo class="todo"
+              :class="{completed: todo.completed, editing: todo == editedTodo}"
+              :key="todo.updatedAt"
+              :todo="todo"
+              v-for="todo in filteredTodos"
+              v-on:remove-todo='removeTodo'
+              >
         </Todo>
       </ul>
     </section>
@@ -34,8 +40,11 @@
 </template>
 
 <script>
+
 import axios from 'axios';
 import Todo from './components/Todo';
+import ENDPOINT from './constants';
+
 
 const filters = {
   all(todos) {
@@ -60,28 +69,20 @@ export default {
       newTodo: '',
       editedTodo: null,
       visibility: 'all',
-      api: 'https://grdao5tka1.execute-api.eu-central-1.amazonaws.com/dev/todos',
     };
   },
   created() {
     this.fetch();
   },
 
-  // watch todos change for localStorage persistence
-  watch: {
-    todos: {
-      deep: true,
-      handler(todos) {
-        this.save(todos);
-      },
-    },
-  },
-
   // computed properties
   // http://vuejs.org/guide/computed.html
   computed: {
     filteredTodos() {
-      return filters[this.visibility](this.todos);
+      let items = this.todos;
+      items = filters[this.visibility](items);
+      items = items.sort((a, b) => new Date(a.createdAt) > new Date(b.createdAt));
+      return items;
     },
     remaining() {
       return filters.active(this.todos).length;
@@ -100,16 +101,13 @@ export default {
 
   methods: {
     fetch() {
-      axios.get(this.api)
+      axios.get(ENDPOINT)
         .then((response) => {
           this.todos = response.data.items;
         })
         .catch((e) => {
           this.errors.push(e);
         });
-    },
-    save(todos) {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(todos));
     },
     pluralize(word, count) {
       return word + (count === 1 ? '' : 's');
@@ -121,8 +119,7 @@ export default {
       if (!value) {
         return;
       }
-      console.log(this.newTodo);
-      axios.post(this.api, data)
+      axios.post(ENDPOINT, data)
         .then((results) => {
           this.todos.push(results.data);
         })
@@ -131,8 +128,8 @@ export default {
         });
       this.newTodo = '';
     },
-
     removeTodo(todo) {
+      console.log('removing todo');
       const index = this.todos.indexOf(todo);
       this.todos.splice(index, 1);
       axios.delete(`${this.api}/${todo.todo_id}`)
@@ -142,31 +139,6 @@ export default {
         });
     },
 
-    editTodo(todo) {
-      this.beforeEditCache = todo.text;
-      this.editedTodo = todo;
-    },
-
-    doneEdit(todo) {
-      if (!this.editedTodo) {
-        return;
-      }
-      this.editedTodo = null;
-      todo.text = todo.text.trim();
-      axios.put(`${this.api}/${todo.todo_id}`, todo)
-        .then()
-        .catch((e) => {
-          this.errors.push(e);
-        });
-      if (!todo.text) {
-        this.removeTodo(todo);
-      }
-    },
-
-    cancelEdit(todo) {
-      this.editedTodo = null;
-      todo.text = this.beforeEditCache;
-    },
 
   },
 
@@ -183,16 +155,6 @@ export default {
 };
 </script>
 
-<style>
-#app {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
-</style>
 <style lang="scss">
 @import 'assets/base.css';
 @import 'assets/index.css';

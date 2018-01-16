@@ -1,7 +1,7 @@
 <template>
   <li :class="{completed: todo.completed, editing: todo == editedTodo}">
     <div class="view">
-      <input class="toggle" type="checkbox" v-model="todo.completed">
+      <input class="toggle" type="checkbox" @click="completeTodo(todo)" v-model="todo.completed">
       <label @dblclick="editTodo(todo)">{{todo.text}}</label>
       <button class="destroy" @click="removeTodo(todo)"></button>
     </div>
@@ -11,6 +11,8 @@
 
 
 <script type = "text/javascript" >
+import axios from 'axios';
+import ENDPOINT from '../constants';
 
 export default {
   props: ['todo'],
@@ -21,7 +23,6 @@ export default {
       newTodo: '',
       editedTodo: null,
       visibility: 'all',
-      api: 'https://grdao5tka1.execute-api.eu-central-1.amazonaws.com/dev/todos',
     };
   },
   methods: {
@@ -29,6 +30,46 @@ export default {
       this.beforeEditCache = todo.text;
       this.editedTodo = todo;
     },
+    doneEdit(todo) {
+      if (!this.editedTodo) {
+        return;
+      }
+      this.editedTodo = null;
+      todo.text = todo.text.trim();
+      axios.put(`${ENDPOINT}/${todo.todo_id}`, todo)
+        .then()
+        .catch((e) => {
+          this.errors.push(e);
+        });
+      if (!todo.text) {
+        this.removeTodo(todo);
+      }
+    },
+
+    cancelEdit(todo) {
+      this.editedTodo = null;
+      todo.text = this.beforeEditCache;
+    },
+
+    completeTodo(todo) {
+      console.log('completeTodo');
+      todo.completed = !todo.completed;
+      console.log(todo.completed);
+      axios.put(`${ENDPOINT}/${todo.todo_id}`, todo)
+        .then((results) => {
+          console.log(results.data.body);
+          todo = results.data.body;
+        })
+        .catch((e) => {
+          this.errors.push(e);
+        });
+    },
+
+    removeTodo(todo) {
+      this.$emit('remove-todo', todo);
+    },
+
+
   },
   directives: {
     'todo-focus': function focus(el, binding) {
