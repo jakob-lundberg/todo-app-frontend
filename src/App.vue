@@ -132,7 +132,7 @@ export default {
       console.log('removing todo');
       const index = this.todos.indexOf(todo);
       this.todos.splice(index, 1);
-      axios.delete(`${this.api}/${todo.todo_id}`)
+      axios.delete(`${ENDPOINT}/${todo.todo_id}`)
         .then()
         .catch((e) => {
           this.errors.push(e);
